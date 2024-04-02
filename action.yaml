@@ -1,0 +1,46 @@
+name: auto-ready-for-review-action
+description: Make draft pull requests ready for review
+inputs:
+  github_token:
+    description: |
+      GitHub Access Token
+      pull-requests:read - Get pull requests
+      pull-requests:write - Update pull requests
+    required: false
+    default: ${{ github.token }}
+  label:
+    description: |
+      Pull Request labels
+    required: false
+    default: auto-ready-for-review
+  comment:
+    description: |
+      Pull Request comment template.
+      If the value is "-", the comment will not be posted.
+    required: false
+    default: ""
+runs:
+  using: composite
+  steps:
+    - run: |
+        while read -r pr_number author; do
+          echo "===> Update PR $pr_number (author: $author)" >&2
+          gh -R "$GITHUB_REPOSITORY" pr ready "$pr_number"
+          gh -R "$GITHUB_REPOSITORY" pr edit --remove-label "$LABEL" "$pr_number"
+          job_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          if [ -z "$COMMENT" ]; then
+            COMMENT="CI succeeded so this pull request got ready for review!"
+          fi
+          if [ "$COMMENT" != "-" ]; then
+            gh -R "$GITHUB_REPOSITORY" pr comment "$pr_number" -b "@author
+
+            $COMMENT
+
+            _This comment was posted by [auto-ready-for-review-action](https://github.com/suzuki-shunsuke/auto-ready-for-review-action)_ [link]($job_url)"
+          fi
+        done < <(gh -R "$GITHUB_REPOSITORY" pr list --json number,author -L 100 -l "$LABEL" -S "status:success is:draft" -q '.[] | (.number|tostring) + " " + .author.login')
+      shell: bash
+      env:
+        LABEL: ${{ inputs.label }}
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+        COMMENT: ${{ inputs.comment }}
