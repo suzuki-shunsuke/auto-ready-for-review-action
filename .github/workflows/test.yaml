@@ -3,6 +3,7 @@ name: Test
 on: pull_request
 jobs:
   test:
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write # To update pull requests
